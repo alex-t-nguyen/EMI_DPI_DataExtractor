@@ -2,4 +2,7 @@
 Read data from .Result file and plot in Spotfire
 
 ## Execution
-Navigate to directory script is saved in and run: python extract_data
+In cmd, navigate to the directory the script is saved in and run:
+```
+python extract_data
+```

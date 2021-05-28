@@ -1,10 +1,6 @@
 import pandas
 import codecs
-
-# constants
-DATA_HEADER = '[TableValues]'
-TYPE_EMISSION = 'emission'
-TYPE_DPI = 'dpi'
+import constants
 
 def get_data(filename, info_type):
     """ 
@@ -24,7 +20,7 @@ def get_data(filename, info_type):
         if len(signal_list) <= 3:
             continue
 
-        append_data(TYPE_EMISSION, data_dict, signal_list)
+        append_data(constants.TYPE_EMISSION, data_dict, signal_list)
 
         # Assign frequency and level values of signal from signal_list
         # Not really necessary, but improves readability
@@ -42,13 +38,13 @@ def get_data(filename, info_type):
 
 def skip_lines(opened_file):
     """ 
-    Skip lines in file up until reading a specific string (DATA_HEADER)
+    Skip lines in file up until reading a specific string (constants.DATA_HEADER)
 
     :param opened_file: file to read
     """
     with codecs.open (opened_file, encoding='utf-16-le') as data_file:
         for line in data_file:
-            if DATA_HEADER not in line:
+            if constants.DATA_HEADER not in line:
                 data_file.next()
             else:
                 break
@@ -63,13 +59,13 @@ def skip_lines(opened_file):
 
 def create_dict(info_type):
     """ 
-    Skip lines in file up until reading a specific string (DATA_HEADER)
+    Skip lines in file up until reading a specific string (constants.DATA_HEADER)
 
     :param info_type: type of data in file (i.e. emission, DPI, etc.)
     """
     switcher = {
-        TYPE_EMISSION: {'Frequency': [], 'Level': []},
-        TYPE_DPI: {'Col1': [], 'Col2': [], 'Col3': [], 'Col4': []},
+        constants.TYPE_EMISSION: {'Frequency': [], 'Level': []},
+        constants.TYPE_DPI: {'Col1': [], 'Col2': [], 'Col3': [], 'Col4': []},
     }
     return switcher.get(info_type, {})
 
@@ -84,10 +80,10 @@ def append_data(info_type, data_dict, signal_list):
     :param signal_list: list of individual signal data values
     :return: data_dict
     """
-    if info_type == TYPE_EMISSION:
+    if info_type == constants.TYPE_EMISSION:
         data_dict['Frequency'].append(signal_list[0])    # add frequency component to data_dict
         data_dict['Level'].append(signal_list[1])
-    elif info_type == TYPE_DPI:
+    elif info_type == constants.TYPE_DPI:
         data_dict['Col1'].append(signal_list[0])
         data_dict['Col2'].append(signal_list[1])
         data_dict['Col3'].append(signal_list[2])

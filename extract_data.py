@@ -11,9 +11,10 @@ import constants
 #CSV_FILE_NAME = '_New_Results.csv'
 
 def main():
-    info_type = get_user_input()
+    info_type = get_user_input_info()
+    dir_path = get_user_input_dir()
     #filename = 'Result Table.Result'
-    file_path_list = fh.get_file(os.getcwd())
+    file_path_list = fh.get_file(dir_path)
     if file_path_list:
         try:
             for path in file_path_list:
@@ -29,10 +30,13 @@ def main():
         print("\"file_path_list\" is empty")
 
 
-def get_user_input():
-    info_type = raw_input("Select information type: (emission, dpi): ")
+def get_user_input_info():
+    info_type = raw_input("Select information type (emission, dpi): ")
     return info_type
 
+def get_user_input_dir():
+    dir_path = raw_input("Enter directory path: ")
+    return dir_path
 
 def create_new_filename(path):
     file_base_name = path.split('\\')[-1]

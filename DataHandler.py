@@ -20,7 +20,7 @@ def get_data(filename, info_type):
         if len(signal_list) <= 3:
             continue
 
-        append_data(constants.TYPE_EMISSION, data_dict, signal_list)
+        append_data(info_type, data_dict, signal_list)
 
         # Assign frequency and level values of signal from signal_list
         # Not really necessary, but improves readability
@@ -65,7 +65,7 @@ def create_dict(info_type):
     """
     switcher = {
         constants.TYPE_EMISSION: {'Frequency': [], 'Level': []},
-        constants.TYPE_DPI: {'Col1': [], 'Col2': [], 'Col3': [], 'Col4': []},
+        constants.TYPE_DPI: {'Col1': []}#, 'Col2': [], 'Col3': [], 'Col4': []},
     }
     return switcher.get(info_type, {})
 
@@ -82,12 +82,12 @@ def append_data(info_type, data_dict, signal_list):
     """
     if info_type == constants.TYPE_EMISSION:
         data_dict['Frequency'].append(signal_list[0])    # add frequency component to data_dict
-        data_dict['Level'].append(signal_list[1])
+        data_dict['Level'].append(signal_list[1])   # add level component to data_dict
     elif info_type == constants.TYPE_DPI:
-        data_dict['Col1'].append(signal_list[0])
-        data_dict['Col2'].append(signal_list[1])
-        data_dict['Col3'].append(signal_list[2])
-        data_dict['Col4'].append(signal_list[3])
+        data_dict['Col1'].append(signal_list[0])    # add Col1 component to data_dict
+        #data_dict['Col2'].append(signal_list[1])
+        #data_dict['Col3'].append(signal_list[2])
+        #data_dict['Col4'].append(signal_list[3])
     else:
         print('Not a valid info_type')
     

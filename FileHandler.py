@@ -11,7 +11,7 @@ def get_file(root_dir):
     """
     file_path_list = []
 
-    for (root, dirs, files) in os.walk(root_dir, topdown=True):
+    for (root, dirs, files) in os.walk(root_dir, topdown=True): # Walk through all folders in root_dir
         if constants.DATA_FILE_NAME in files: # if .Result file is in folder
             csv_file_name = create_new_filename(root)   # new .csv file name
             if csv_file_name not in files:  # if .csv file for corresponding .Result file is not in folder

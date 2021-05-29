@@ -6,10 +6,6 @@ import csv
 import sys
 import constants
 
-#constants
-#FILE_NAME = 'Result Table.Result'
-#CSV_FILE_NAME = '_New_Results.csv'
-
 def main():
     info_type = get_user_input_info()
     dir_path = get_user_input_dir()
@@ -31,14 +27,32 @@ def main():
 
 
 def get_user_input_info():
+    """
+    Asks user for input for type of data
+
+    :return: type of info as string
+    """
     info_type = raw_input("Select information type (emission, dpi): ")
     return info_type
 
+
 def get_user_input_dir():
+    """
+    Asks user for input for directory path of folder containing all data
+
+    :return: directory path as string
+    """
     dir_path = raw_input("Enter directory path: ")
     return dir_path
 
+
 def create_new_filename(path):
+    """
+    Creates new file name for generated .csv file
+
+    :param path: path to directory of .Result file
+    :return: name of generated .csv file as string
+    """
     file_base_name = path.split('\\')[-1]
     return file_base_name + constants.CSV_FILE_NAME
 

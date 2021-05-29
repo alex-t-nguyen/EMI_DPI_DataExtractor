@@ -1,6 +1,7 @@
 import pandas
 import codecs
 import constants
+import re
 
 def get_data(filename, info_type):
     """ 
@@ -11,7 +12,8 @@ def get_data(filename, info_type):
     """
 
     #data_dict = {'Frequency': [], 'Level': []}
-    data_dict = create_dict(info_type)
+    col_names = get_col_names(filename, info_type)
+    data_dict = create_dict(info_type, col_names)
     #with open(filename) as fp:
         # skip_lines(fp, 7)   # skip lines 1-7 in file
     for line in skip_lines(filename):
@@ -20,7 +22,7 @@ def get_data(filename, info_type):
         if len(signal_list) <= 3:
             continue
 
-        append_data(info_type, data_dict, signal_list)
+        append_data(col_names, data_dict, signal_list)
 
         # Assign frequency and level values of signal from signal_list
         # Not really necessary, but improves readability
@@ -57,20 +59,27 @@ def skip_lines(opened_file):
                 yield line
 
 
-def create_dict(info_type):
+def create_dict(info_type, col_names):
     """ 
     Skip lines in file up until reading a specific string (constants.DATA_HEADER)
 
     :param info_type: type of data in file (i.e. emission, DPI, etc.)
     """
+    data_dict = {}
+    for name in col_names:
+        data_dict[name] = []
+    return data_dict
+    """
     switcher = {
-        constants.TYPE_EMISSION: {'Frequency': [], 'Level': []},
+        constants.TYPE_EMISSION:    
+            {'Frequency': [], 'Level': []},
         constants.TYPE_DPI: {'Col1': []}#, 'Col2': [], 'Col3': [], 'Col4': []},
     }
     return switcher.get(info_type, {})
+    """
 
 
-def append_data(info_type, data_dict, signal_list):
+def append_data(col_names, data_dict, signal_list):
     """ 
     Appends signal data to dictionary.
     Number of keys in dictionary (data_dict) depends on file (info_type) read
@@ -79,6 +88,9 @@ def append_data(info_type, data_dict, signal_list):
     :param data_dict: dictionary containing signal data
     :param signal_list: list of individual signal data values
     :return: data_dict
+    """
+    for i in range(len(col_names)):
+        data_dict[col_names[i]].append(signal_list[constants.EMISSION_COL_INDEXES[i]])
     """
     if info_type == constants.TYPE_EMISSION:
         data_dict['Frequency'].append(signal_list[0])    # add frequency component to data_dict
@@ -90,9 +102,27 @@ def append_data(info_type, data_dict, signal_list):
         #data_dict['Col4'].append(signal_list[3])
     else:
         print('Not a valid info_type')
-    
+    """
     return data_dict
 
+
+def get_col_names(filename, info_type):
+    column_names = []
+    desired_col_names = []
+    with codecs.open (filename, encoding='utf-16-le') as data_file:
+        for line in data_file:
+            if constants.COLUMN_NAME_HEADER in line:
+                column_names = line.strip('\n').split('\t') # get all column names in file
+                del column_names[0]
+                break
+    for i in range(len(column_names)):
+        if info_type == constants.TYPE_EMISSION:
+            if i in constants.EMISSION_COL_INDEXES:
+                desired_col_names.append(column_names[i]) # add all desired column names to list
+        if info_type == constants.TYPE_DPI:
+            if i in constants.DPI_COL_INDEXES:
+                desired_col_names.append(column_names[i])
+    return desired_col_names
 
 if __name__ == '__main__':
     get_data('Result Table.Result')

@@ -7,8 +7,8 @@ import sys
 import constants
 
 def main():
-    info_type = get_user_input_info()
-    dir_path = get_user_input_dir()
+    info_type = get_user_input_info()   # User input info type
+    dir_path = get_user_input_dir() # User input directory path of root folder containing data files
     #filename = 'Result Table.Result'
     file_path_list = fh.get_file(dir_path)
     if file_path_list:

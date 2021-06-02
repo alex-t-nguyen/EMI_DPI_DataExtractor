@@ -1,7 +1,6 @@
 import pandas
 import codecs
 import constants
-import re
 
 def get_data(filename, info_type):
     """ 
@@ -61,9 +60,10 @@ def skip_lines(opened_file):
 
 def create_dict(info_type, col_names):
     """ 
-    Skip lines in file up until reading a specific string (constants.DATA_HEADER)
+    Creates a dictionary with all of the column names as keys and empty lists as values for each key
 
     :param info_type: type of data in file (i.e. emission, DPI, etc.)
+    :col_names: names of columns to be used as keys in dictionary
     """
     data_dict = {}
     for name in col_names:
@@ -107,6 +107,13 @@ def append_data(col_names, data_dict, signal_list):
 
 
 def get_col_names(filename, info_type):
+    """
+    Gets the desired data column names depending on the info_type
+
+    :param filename: data file
+    :param info_type: data information type
+    :return: list of desired column names
+    """
     column_names = []
     desired_col_names = []
     with codecs.open (filename, encoding='utf-16-le') as data_file:
@@ -116,10 +123,10 @@ def get_col_names(filename, info_type):
                 del column_names[0]
                 break
     for i in range(len(column_names)):
-        if info_type == constants.TYPE_EMISSION:
+        if info_type.lower() == constants.TYPE_EMISSION:
             if i in constants.EMISSION_COL_INDEXES:
                 desired_col_names.append(column_names[i]) # add all desired column names to list
-        if info_type == constants.TYPE_DPI:
+        if info_type.lower() == constants.TYPE_DPI:
             if i in constants.DPI_COL_INDEXES:
                 desired_col_names.append(column_names[i])
     return desired_col_names

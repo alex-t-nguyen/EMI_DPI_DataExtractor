@@ -2,6 +2,8 @@
 FILE_NAME = 'Result Table.Result'
 CSV_FILE_NAME = '_New_Results.csv'
 DATA_FILE_NAME = 'Result Table.Result'
+MODE_GENERAL = 'general'
+MODE_SELECTIVE = 'selective'
 
 # DataHandler
 DATA_HEADER = '[TableValues]'

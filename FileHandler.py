@@ -12,17 +12,20 @@ def get_file(root_dir, overwrite=False):
     :return: list of directory paths for .Result files without a corresponding .csv file.
     """
     file_path_list = []
+    result_file_flag = False
 
     for (root, dirs, files) in os.walk(root_dir, topdown=True): # Walk through all folders in root_dir
         if constants.DATA_FILE_NAME in files: # if .Result file is in folder
+            result_file_flag = True
             csv_file_name = create_new_filename(root)   # new .csv file name
             if overwrite:
                 file_path_list.append(root)
             else:
                 if csv_file_name not in files:  # if .csv file for corresponding .Result file is not in folder
                     file_path_list.append(root) # Add folder path to list to create .csv later on
-                
-    if not file_path_list:
+    if not result_file_flag:
+        print("No \"Result Table.Result\" files found in specified path ({}).".format(root_dir))          
+    elif not file_path_list:
         print("All \"Result Table.Result\" files already have corresponding \"New_Results.csv\" files.")
     return file_path_list
 
@@ -37,9 +40,11 @@ def get_dir(root_dir, overwrite=False):
     """
     folder_properties = []
     folder_list = []
+    result_file_flag = False
 
     for (root, dirs, files) in os.walk(root_dir, topdown=True): # Walk through all folders in root_dir 
         if constants.DATA_FILE_NAME in files: # if .Result file is in 
+            result_file_flag = True
             del folder_properties[:]
             csv_file_name = create_new_filename(root)   # new .csv file name
             if overwrite:
@@ -53,7 +58,11 @@ def get_dir(root_dir, overwrite=False):
                     folder_list.append(folder_properties[:]) # Add list of folder properties (name and path) to folder list
             #print(folder_properties)
             #print(folder_list)
-    if not folder_list:
+
+    if not result_file_flag:
+        print("No \"Result Table.Result\" files found in specified path ({}).".format(root_dir)) 
+        return folder_list
+    elif not folder_list:
         print("The selected \"Result Table.Result\" files already have corresponding \"New_Results.csv\" files.")
         return folder_list
 
@@ -78,7 +87,7 @@ def get_dir(root_dir, overwrite=False):
     selected_path_list = []
     for index in selected_dir_list:
         selected_path_list.append(data_frame.iloc[index, 1])
-        
+
     return selected_path_list
 
 

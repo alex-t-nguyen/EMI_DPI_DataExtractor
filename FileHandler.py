@@ -17,10 +17,10 @@ def get_file(root_dir, overwrite=False):
     for (root, dirs, files) in os.walk(root_dir, topdown=True): # Walk through all folders in root_dir
         if constants.DATA_FILE_NAME in files: # if .Result file is in folder
             result_file_flag = True
-            csv_file_name = create_new_filename(root)   # new .csv file name
-            if overwrite:
+            csv_file_name = create_new_filename(root, constants.CSV_FILE_NAME)   # new .csv file name
+            if overwrite:   # if overwriting current .csv files
                 file_path_list.append(root)
-            else:
+            else:   # if ignoring current .csv files
                 if csv_file_name not in files:  # if .csv file for corresponding .Result file is not in folder
                     file_path_list.append(root) # Add folder path to list to create .csv later on
     if not result_file_flag:
@@ -43,10 +43,10 @@ def get_dir(root_dir, overwrite=False):
     result_file_flag = False
 
     for (root, dirs, files) in os.walk(root_dir, topdown=True): # Walk through all folders in root_dir 
-        if constants.DATA_FILE_NAME in files: # if .Result file is in 
+        if constants.FILE_NAME in files: # if .Result file is in 
             result_file_flag = True
             del folder_properties[:]
-            csv_file_name = create_new_filename(root)   # new .csv file name
+            csv_file_name = create_new_filename(root, constants.CSV_FILE_NAME)   # new .csv file name
             if overwrite:
                 folder_properties.append(root.split('\\')[-1]) # Add folder name to list
                 folder_properties.append(root) # Add folder path to list to navigate with later on
@@ -75,33 +75,91 @@ def get_dir(root_dir, overwrite=False):
     correct_input = False
     num_rows = int(data_frame.shape[0])
     selected_dir_list = []
-    while not correct_input:
-        selected_dir_list = get_user_input_sel_dir()
-        for num in selected_dir_list:
-            if num >= num_rows or num < 0:
-                print("An index must be a number between 0 and " + str(num_rows - 1) + ".")
+    sel_type = get_user_input_sel_type()
+    while not correct_input:    # Check user input for valid input
+        selected_dir_list = get_user_input_sel_dir(sel_type)
+        if sel_type.lower() == 'i':
+            for num in selected_dir_list:   # If select index mode for selection
+                if num >= num_rows or num < 0:
+                    print("An index must be a number between 0 and " + str(num_rows - 1) + ".")
+                    correct_input = False
+                    break
+                correct_input = True
+        elif sel_type.lower() == 'c':   # If select custom mode for selection
+            unfound_key_list = []
+            for key in selected_dir_list: # Check all desired keys in every folder in dataframe (folder names must contain all keys inputted by user --- NOT at least 1)
                 correct_input = False
-                break
-            correct_input = True
-    
+                for index, row in data_frame.iterrows():
+                    keys_substring = get_key_substring(row['Folders'])
+                    if key in keys_substring:
+                        correct_input = True
+                if key not in unfound_key_list and not correct_input:   # If key is found in folder name, don't add to unfound list
+                        unfound_key_list.append(key)
+            
+            if unfound_key_list:    # If at least 1 key inputted by user was not found in folders
+                print("Key(s) [" + ', '.join(unfound_key_list) + "] could not be found from available keys in folder names.")
+                correct_input = False
+            else:
+                correct_input = True
+        else:
+            print("Invalid input.")
+            sel_type = get_user_input_sel_type()
+            correct_input = False
+
     selected_path_list = []
-    for index in selected_dir_list:
-        selected_path_list.append(data_frame.iloc[index, 1])
+    if sel_type.lower() == 'i':
+        for index in selected_dir_list:
+            selected_path_list.append(data_frame.iloc[index, 1])
+    elif sel_type.lower() == 'c':
+        for index, row in data_frame.iterrows():
+            #start_marker = row['Folders'].find('[') + len('[')
+            #end_marker = row['Folders'].find(']')
+            #keys_substring = row['Folders'][start_marker:end_marker]
+
+            keys_substring = get_key_substring(row['Folders'])
+
+            if all(key in keys_substring for key in selected_dir_list):
+                selected_path_list.append(data_frame.iloc[index, 1])
 
     return selected_path_list
 
 
-def get_user_input_sel_dir():
+def get_user_input_sel_dir(sel_type):
     parsed = False
+    selected_dir_list = []
     while not parsed:
         try:
-            dir_user_input = raw_input("Select indices of folders to create \".csv\" files for (Enter as comma or space separated list): ")
-            dir_user_input = dir_user_input.strip() # Remove leading and trialing spaces
-            selected_dir_list = list(map(int, re.split(',| ', dir_user_input))) # Remove comma and spaces from user input for indices
-            parsed = True
+            if sel_type.lower() == 'i':
+                dir_user_input = raw_input("Select indices of folders to create \".csv\" files for (Enter as comma or space separated list): ")
+                dir_user_input = dir_user_input.strip() # Remove leading and trailing spaces
+                selected_dir_list = list(map(int, re.split(',| ', dir_user_input))) # Remove comma and spaces from user input for indices
+                parsed = True
+            elif sel_type.lower() == 'c':
+                dir_user_input = raw_input("Enter keyword(s) for custom selection (Enter as comma or space separated list): ")
+                dir_user_input = dir_user_input.strip() # Remove leading and trailing spaces
+                selected_dir_list = list(re.split(',| ', dir_user_input)) # Remove comma and spaces from user input for indices
+                parsed = True
+
+                # Copy user input keys into constants variable for to append to filename when making aggregated .csv file
+                constants.KEYS = selected_dir_list[:]
+            else:
+                break
         except ValueError:
             print("Invalid list. Check syntax.\ni.e.\nComma-separated: 1,2,3\nSpace-separated: 1 2 3")
     return selected_dir_list
+
+
+def get_user_input_sel_type():
+    sel_type = raw_input("Select data by index or custom (I/C)? ")
+    return sel_type
+
+
+def get_key_substring(line):
+    start_marker = line.find('[') + len('[')
+    end_marker = line.find(']')
+    keys_substring = line[start_marker:end_marker]
+
+    return keys_substring
 
 
 if __name__ == "__main__":

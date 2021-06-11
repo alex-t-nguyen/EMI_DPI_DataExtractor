@@ -36,14 +36,11 @@ def main():
             for path in file_path_list:
                 os.chdir(path)
                 df = get_data(constants.FILE_NAME, info_type)
-
                 #df['Data Set'] = path.split('\\')[-1]
-                df = add_identifier_columns(df, info_type, path.split('\\')[-1])
-
+                df = add_identifier_columns(df, info_type, path.split('\\')[-1]).copy(deep=True)
                 #print(df)
                 new_filename = create_new_filename(path, constants.CSV_FILE_NAME)
                 df.to_csv(new_filename, sep = ',', index = False)
-
 
                 df['Limit Line'] = ''
 
@@ -52,8 +49,7 @@ def main():
             
             master_df = create_master_df(df_list)
 
-
-            master_df = add_limit_line(master_df, df_list, dir_path)
+            master_df = add_limit_line(master_df, df_list, dir_path, info_type).copy(deep=True)
 
             os.chdir(dir_path)
             aggregated_csv_filename = create_new_filename(dir_path, constants.AGGREGATED_CSV_FILE_NAME, constants.KEYS)
@@ -145,9 +141,7 @@ def create_new_filename(path, appended_filename, keys=None):
 
 def create_master_df(df_list):
     master_dict = {}
-
     master_df = pd.DataFrame() #df_list[0][0].copy(deep=True)
-
     # Check length of dataframe (# of rows) to determine size for new dictionary (master_dict)
     # Arrays in master_dict need to be same size to put into pandas dataframe
     lf_index, largest_index_row = 0, len(df_list[0][0])#float(df_list[0][0]['Frequency'].iloc[-1])
@@ -156,14 +150,12 @@ def create_master_df(df_list):
         if index_row > largest_index_row:
             lf_index, largest_index_row = i, index_row
 
-
     #master_dict['Frequency'] = df_list[lf_index][0]['Frequency'].to_list() -------------------- Probably not used, so can delete --------------------------------------------------
     """
     for col in df_list[0][0].columns:
         if col != 'Frequency':
             master_df.drop(col, axis=1, inplace=True)   # Drop the data columns in master_df to prevent duplicates when comparing with the same data in loop below
     """
-
    # master_df['Frequency'] = pd.to_numeric(master_df['Frequency'], errors='coerce')
     for df in df_list:
         temp_names = []
@@ -177,10 +169,9 @@ def create_master_df(df_list):
         
         #df[0]['Frequency'] = pd.to_numeric(df[0]['Frequency'], errors='coerce')
         #master_df = pd.merge(master_df, df[0], how='outer', on='Frequency')
-        master_df = master_df.append(df[0], ignore_index=True, sort=False)
-    master_df['Frequency'] = pd.to_numeric(master_df['Frequency'], errors='coerce')
+        master_df = master_df.append(df[0], ignore_index=True, sort=False).copy(deep=True)
+    master_df['Frequency'] = pd.to_numeric(master_df['Frequency'], errors='coerce').copy(deep=True)
     #master_df = master_df.sort_values('Frequency', ascending=True) # ---------------------- Uncomment if frequency values need to be sorted ----------------------------------
-
     #print(master_df)
     """
     for df in df_list:
@@ -203,7 +194,7 @@ def create_master_df(df_list):
     """
     return master_df
 
-  
+
 def add_identifier_columns(data_frame, info_type, folder_name):
     keys = folder_name.split(' ')
     data_frame['Data Set'] = folder_name
@@ -221,7 +212,7 @@ def add_identifier_columns(data_frame, info_type, folder_name):
     return data_frame
 
 
-def add_limit_line(master_df, df_list, path):
+def add_limit_line(master_df, df_list, path, info_type):
     limit_line_file_flag = False
     limit_line_file_list = []
     for (root, dirs, files) in os.walk(path, topdown=True): # Walk through all folders in root_dir
@@ -236,13 +227,20 @@ def add_limit_line(master_df, df_list, path):
     for df in df_list:  # -------------- LIMIT LINE ALWAYS 1-1000, MAYBE JUST USE 1 DF's FREQUENCY VALUES FOR ALL OF THE LIMIT LINES ---------------------------------
         df_only_list.append(df[0])
 
-    for df in df_only_list: # Clear unwanted column data in df to make it a limit_line df instead
+    for limit_line_path in limit_line_file_list: # Create limit line df for each file in limit line list
+        #for df in df_only_list: # Clear unwanted column data in df to make it a limit_line df instead
+        df = df_only_list[0].copy(deep=True)    # temp df for limit line df
         for col in df.columns:
-            if col not in constants.IMPORTANT_COL_NAMES:
+            if col not in constants.IMPORTANT_COL_NAMES:    # Empty data in columns not necessary for limit line df
                 df[col] = ''
-        for limit_line_path in limit_line_file_list: # Create limit line df for each file in limit line list
-            df['Data Set'] = 'LL ' + os.path.splitext(limit_line_path.split('\\')[-1])[0] # Create name for data set (LL + filename w/o extension)
 
+        df['Data Set'] = 'LL ' + os.path.splitext(limit_line_path.split('\\')[-1])[0] # Create name for data set (LL + filename w/o extension)
+        """
+        if info_type.lower() == constants.TYPE_EMISSION:
+            df['Frequency'] == df['Frequency'].replace(df.loc[:, 'Frequency'], constants.LL_FREQUENCY_LIST_EMISSION)    # Replace frequency values of df with preset frequency values 
+        elif info_type.lower() == constants.TYPE_DPI:
+            df['Frequency'] == df['Frequency'].replace(df.loc[:, 'Frequency'], constants.LL_FREQUENCY_LIST_DPI)
+        """
         with codecs.open(limit_line_path, encoding='utf-16-le') as limit_line_file:   
             for i in range(28):
                 limit_line_file.readline()
@@ -260,9 +258,9 @@ def add_limit_line(master_df, df_list, path):
 
                 if math.isnan(slope):
                     continue
-                temp_df = df.loc[(df.loc[:, 'Frequency'].apply(lambda x: float(x)) >= coord0[0]) & (df.loc[:, 'Frequency'].apply(lambda x: float(x)) <= coord1[0])] # ------------ REMEMBER TO CONVERT NUMBERS IN DF FROM STRING TO FLOAT ------------------------------------
-                temp_df.loc[:, 'Limit Line'] = temp_df.loc[:, 'Frequency'].apply(lambda x: calc_limit(slope, float(x), coord0, coord1))
-                print(temp_df)
+                temp_df = df.loc[(df.loc[:, 'Frequency'].apply(lambda x: float(x)) >= coord0[0]) & (df.loc[:, 'Frequency'].apply(lambda x: float(x)) <= coord1[0]), :].copy(deep=True) # ------------ REMEMBER TO CONVERT NUMBERS IN DF FROM STRING TO FLOAT ------------------------------------
+                temp_df.loc[:, 'Limit Line'] = temp_df.loc[:, 'Frequency'].apply(lambda x: calc_limit(slope, float(x), coord0, coord1)).copy(deep=True)
+                #print(temp_df)
                 temp_df_list.append(temp_df)
                 """ ----------------------------------- TAKES EXTREMELY LONG TIME ( > 5 MINUTES) -------------------------------
                 for index, row in df.iterrows():
@@ -287,7 +285,8 @@ def add_limit_line(master_df, df_list, path):
                             df['Limit Line'][index] = calc_limit(slope, float(row['Frequency']), coord0)
                 """
             new_df = pd.concat(temp_df_list, ignore_index=True)
-            master_df = master_df.append(new_df, ignore_index=True, sort=False)
+            master_df = master_df.append(new_df, ignore_index=True, sort=False).copy(deep=True)
+            #master_df = new_df.append(master_df, ignore_index=True, sort=False)
 
     return master_df
 

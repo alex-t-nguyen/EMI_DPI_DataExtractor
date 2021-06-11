@@ -27,8 +27,6 @@ def get_data(filename, info_type):
                 signal_list[i] = '' # make dashes equal to blank instead of NaN since spotfire does it anyway
 
         append_data(col_names, data_dict, signal_list, info_type)   # Add data from each row into corresponding key/column in data dictionary
-                
-
 
         # Assign frequency and level values of signal from signal_list
         # Not really necessary, but improves readability

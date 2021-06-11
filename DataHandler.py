@@ -17,11 +17,16 @@ def get_data(filename, info_type):
         # skip_lines(fp, 7)   # skip lines 1-7 in file
     for line in skip_lines(filename):
         signal_list = line.strip('\n').strip().split('\t')   # remove \n char at end of line and separate data into list
-        
-        if len(signal_list) <= 3:
+        #print(signal_list)
+
+        if len(signal_list) <= 1:   # If line is empty -> prevents error when trying to read the empty last line in .Results file
             continue
 
-        append_data(col_names, data_dict, signal_list)
+        for i in range(len(signal_list)):
+            if signal_list[i] == '---':
+                signal_list[i] = '' # make dashes equal to blank instead of NaN since spotfire does it anyway
+
+        append_data(col_names, data_dict, signal_list, info_type)   # Add data from each row into corresponding key/column in data dictionary
 
         # Assign frequency and level values of signal from signal_list
         # Not really necessary, but improves readability
@@ -39,23 +44,32 @@ def get_data(filename, info_type):
 
 def skip_lines(opened_file):
     """ 
-    Skip lines in file up until reading a specific string (constants.DATA_HEADER)
+    Skip lines in file up until reading a specific string (constants.DATA_HEADER) (skip first 28 lines)
 
     :param opened_file: file to read
     """
-    with codecs.open (opened_file, encoding='utf-16-le') as data_file:
-        for line in data_file:
-            if constants.DATA_HEADER not in line:
-                data_file.next()
-            else:
-                break
-        #for i in range(28):
-        #    data_file.readline()
-        for line in data_file:
-            if not line:
-                continue
-            else:
-                yield line
+    try:
+        with codecs.open (opened_file, encoding='utf-16-le') as data_file:
+            """
+            for line in data_file:
+                if constants.DATA_HEADER.encode('utf-16-le') not in line:
+                    data_file.next()
+                    #print("next")
+                else:
+                    break
+                    print("break")
+            """
+            
+            for i in range(28):
+                data_file.readline()
+
+            for line in data_file:
+                if not line:
+                    continue
+                else:
+                    yield line
+    except IOError:
+        print("Can't open file")
 
 
 def create_dict(info_type, col_names):
@@ -68,6 +82,7 @@ def create_dict(info_type, col_names):
     data_dict = {}
     for name in col_names:
         data_dict[name] = []
+    # data_dict['Limit Line'] = []    # Add Limit Line column to data dictionary ----- DO this in extract_data.py because we don't want the empty limit line column in individual .csv file --------------------------
     return data_dict
     """
     switcher = {
@@ -79,7 +94,7 @@ def create_dict(info_type, col_names):
     """
 
 
-def append_data(col_names, data_dict, signal_list):
+def append_data(col_names, data_dict, signal_list, info_type):
     """ 
     Appends signal data to dictionary.
     Number of keys in dictionary (data_dict) depends on file (info_type) read
@@ -89,8 +104,14 @@ def append_data(col_names, data_dict, signal_list):
     :param signal_list: list of individual signal data values
     :return: data_dict
     """
+    index_list = []
+    if info_type.lower() == constants.TYPE_EMISSION:
+        index_list = constants.EMISSION_COL_INDEXES[:]
+    elif info_type.lower() == constants.TYPE_DPI:
+        index_list = constants.DPI_COL_INDEXES[:]
+
     for i in range(len(col_names)):
-        data_dict[col_names[i]].append(signal_list[constants.EMISSION_COL_INDEXES[i]])
+        data_dict[col_names[i]].append(signal_list[index_list[i]])
     """
     if info_type == constants.TYPE_EMISSION:
         data_dict['Frequency'].append(signal_list[0])    # add frequency component to data_dict

@@ -24,9 +24,11 @@ def get_data(filename, info_type):
 
         for i in range(len(signal_list)):
             if signal_list[i] == '---':
-                signal_list[i] = 'NaN'
+                signal_list[i] = '' # make dashes equal to blank instead of NaN since spotfire does it anyway
 
-        append_data(col_names, data_dict, signal_list, info_type)
+        append_data(col_names, data_dict, signal_list, info_type)   # Add data from each row into corresponding key/column in data dictionary
+                
+
 
         # Assign frequency and level values of signal from signal_list
         # Not really necessary, but improves readability
@@ -82,6 +84,7 @@ def create_dict(info_type, col_names):
     data_dict = {}
     for name in col_names:
         data_dict[name] = []
+    # data_dict['Limit Line'] = []    # Add Limit Line column to data dictionary ----- DO this in extract_data.py because we don't want the empty limit line column in individual .csv file --------------------------
     return data_dict
     """
     switcher = {

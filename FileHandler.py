@@ -155,11 +155,11 @@ def get_user_input_sel_type():
 
 
 def get_key_substring(line):
-    start_marker = line.find('[') + len('[')
-    end_marker = line.find(']')
-    keys_substring = line[start_marker:end_marker]
-
-    return keys_substring
+    #start_marker = line.find('[') + len('[')
+    #end_marker = line.find(']')
+    #keys_substring = line[start_marker:end_marker]
+    keys_list = line.split(' ')
+    return keys_list
 
 
 if __name__ == "__main__":

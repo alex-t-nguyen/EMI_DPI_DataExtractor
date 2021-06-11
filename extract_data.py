@@ -36,11 +36,14 @@ def main():
             for path in file_path_list:
                 os.chdir(path)
                 df = get_data(constants.FILE_NAME, info_type)
+
                 #df['Data Set'] = path.split('\\')[-1]
                 df = add_identifier_columns(df, info_type, path.split('\\')[-1])
+
                 #print(df)
                 new_filename = create_new_filename(path, constants.CSV_FILE_NAME)
                 df.to_csv(new_filename, sep = ',', index = False)
+
 
                 df['Limit Line'] = ''
 
@@ -48,6 +51,7 @@ def main():
                 #print(df_list)
             
             master_df = create_master_df(df_list)
+
 
             master_df = add_limit_line(master_df, df_list, dir_path)
 
@@ -141,7 +145,9 @@ def create_new_filename(path, appended_filename, keys=None):
 
 def create_master_df(df_list):
     master_dict = {}
+
     master_df = pd.DataFrame() #df_list[0][0].copy(deep=True)
+
     # Check length of dataframe (# of rows) to determine size for new dictionary (master_dict)
     # Arrays in master_dict need to be same size to put into pandas dataframe
     lf_index, largest_index_row = 0, len(df_list[0][0])#float(df_list[0][0]['Frequency'].iloc[-1])
@@ -150,12 +156,14 @@ def create_master_df(df_list):
         if index_row > largest_index_row:
             lf_index, largest_index_row = i, index_row
 
+
     #master_dict['Frequency'] = df_list[lf_index][0]['Frequency'].to_list() -------------------- Probably not used, so can delete --------------------------------------------------
     """
     for col in df_list[0][0].columns:
         if col != 'Frequency':
             master_df.drop(col, axis=1, inplace=True)   # Drop the data columns in master_df to prevent duplicates when comparing with the same data in loop below
     """
+
    # master_df['Frequency'] = pd.to_numeric(master_df['Frequency'], errors='coerce')
     for df in df_list:
         temp_names = []
@@ -172,6 +180,7 @@ def create_master_df(df_list):
         master_df = master_df.append(df[0], ignore_index=True, sort=False)
     master_df['Frequency'] = pd.to_numeric(master_df['Frequency'], errors='coerce')
     #master_df = master_df.sort_values('Frequency', ascending=True) # ---------------------- Uncomment if frequency values need to be sorted ----------------------------------
+
     #print(master_df)
     """
     for df in df_list:
@@ -194,7 +203,7 @@ def create_master_df(df_list):
     """
     return master_df
 
-
+  
 def add_identifier_columns(data_frame, info_type, folder_name):
     keys = folder_name.split(' ')
     data_frame['Data Set'] = folder_name

@@ -28,5 +28,4 @@ EMISSION_IDENTIFIERS = ['Part ID', 'PG', 'Trim', 'Choke']
 DPI_IDENTIFIERS = ['Part ID', 'PG', 'Package', '-', '-', '-', 'Choke']
 
 # Limit Line
-LL_FREQUENCY_LIST_EMISSION = []
-LL_FREQUENCY_LIST_DPI = []
+LL_FREQUENCY_LIST = []

@@ -94,11 +94,11 @@ def get_user_input_mode():
 
     :return: mode type
     """
-    mode = raw_input("Select data extraction mode ({}): ".format(', '.join(constants.MODE_TYPES_LIST)))
-
-    while mode not in constants.MODE_TYPES_LIST:
-        print("The selected mode type is not an available option.")
-        mode  = raw_input("Select data extraction mode ({}): ".format(', '.join(constants.MODE_TYPES_LIST)))
+    mode = raw_input("Select data extraction mode ({}) (G/S): ".format(', '.join(constants.MODE_TYPES_LIST)))
+    if mode != 'g' and mode != 's':
+        while mode not in constants.MODE_TYPES_LIST:
+            print("The selected mode type is not an available option.")
+            mode  = raw_input("Select data extraction mode ({}): ".format(', '.join(constants.MODE_TYPES_LIST)))
     return mode
 
 
@@ -215,25 +215,30 @@ def add_identifier_columns(data_frame, info_type, folder_name):
 def add_limit_line(master_df, df_list, path, info_type):
     limit_line_file_flag = False
     limit_line_file_list = []
+    temp_ll_file_list = []
     for (root, dirs, files) in os.walk(path, topdown=True): # Walk through all folders in root_dir
         for filename in files:
             if filename.endswith(constants.LIMIT_LINE_FILE_SUFFIX): # if .LimitLine file is in folder
-                limit_line_file_flag = True
-                limit_line_file_list.append(os.path.join(root, filename))
+                limit_line_file_flag = True               
+                if filename not in temp_ll_file_list:
+                    limit_line_file_list.append(os.path.join(root, filename))
+                    temp_ll_file_list.append(filename)
     if not limit_line_file_flag:
         print("No \".LimitLine\" files found in specified path ({}).".format(path))
 
+    #print(limit_line_file_list)
     df_only_list = []
     for df in df_list:  # -------------- LIMIT LINE ALWAYS 1-1000, MAYBE JUST USE 1 DF's FREQUENCY VALUES FOR ALL OF THE LIMIT LINES ---------------------------------
         df_only_list.append(df[0])
 
+    constants.LL_FREQUENCY_LIST = create_ll_frequency([])
     for limit_line_path in limit_line_file_list: # Create limit line df for each file in limit line list
         #for df in df_only_list: # Clear unwanted column data in df to make it a limit_line df instead
         df = df_only_list[0].copy(deep=True)    # temp df for limit line df
         for col in df.columns:
             if col not in constants.IMPORTANT_COL_NAMES:    # Empty data in columns not necessary for limit line df
                 df[col] = ''
-
+        
         df['Data Set'] = 'LL ' + os.path.splitext(limit_line_path.split('\\')[-1])[0] # Create name for data set (LL + filename w/o extension)
         """
         if info_type.lower() == constants.TYPE_EMISSION:
@@ -242,8 +247,19 @@ def add_limit_line(master_df, df_list, path, info_type):
             df['Frequency'] == df['Frequency'].replace(df.loc[:, 'Frequency'], constants.LL_FREQUENCY_LIST_DPI)
         """
         with codecs.open(limit_line_path, encoding='utf-16-le') as limit_line_file:   
-            for i in range(28):
-                limit_line_file.readline()
+            for line in limit_line_file:  # Skips lines until reading 'TableValues' line
+                if constants.DATA_HEADER.encode(encoding='utf-16-le') not in line.encode(encoding='utf-16-le'): # Check for 'TableValues' string in line 
+                    continue
+                else:
+                    break
+            """
+            if info_type == constants.TYPE_EMISSION:
+                for i in range(27): # skip lines in limit line file
+                    limit_line_file.readline()
+            if info_type == constants.TYPE_DPI:
+                for i in range(28):
+                    limit_line_file.readline()
+            """
             limit_lines = limit_line_file.readlines() # Get all remaining lines in file
 
             curr_line = limit_lines[0]
@@ -258,10 +274,19 @@ def add_limit_line(master_df, df_list, path, info_type):
 
                 if math.isnan(slope):
                     continue
-                temp_df = df.loc[(df.loc[:, 'Frequency'].apply(lambda x: float(x)) >= coord0[0]) & (df.loc[:, 'Frequency'].apply(lambda x: float(x)) <= coord1[0]), :].copy(deep=True) # ------------ REMEMBER TO CONVERT NUMBERS IN DF FROM STRING TO FLOAT ------------------------------------
+                
+                
+                
+                ll_df = create_ll_df(df, constants.LL_FREQUENCY_LIST, limit_line_path)
+                
+                ll_df.sort_values(by='Frequency', ascending=True)
+                temp_df = ll_df.loc[(ll_df.loc[:, 'Frequency'].apply(lambda x: float(x)) >= coord0[0]) & (ll_df.loc[:, 'Frequency'].apply(lambda x: float(x)) <= coord1[0]), :].copy(deep=True) # ------------ REMEMBER TO CONVERT NUMBERS IN DF FROM STRING TO FLOAT ------------------------------------
+                #print(coord0[0])
                 temp_df.loc[:, 'Limit Line'] = temp_df.loc[:, 'Frequency'].apply(lambda x: calc_limit(slope, float(x), coord0, coord1)).copy(deep=True)
+
                 #print(temp_df)
                 temp_df_list.append(temp_df)
+                #print(temp_df)
                 """ ----------------------------------- TAKES EXTREMELY LONG TIME ( > 5 MINUTES) -------------------------------
                 for index, row in df.iterrows():
                     
@@ -285,12 +310,22 @@ def add_limit_line(master_df, df_list, path, info_type):
                             df['Limit Line'][index] = calc_limit(slope, float(row['Frequency']), coord0)
                 """
             new_df = pd.concat(temp_df_list, ignore_index=True)
+            #print(new_df)
             master_df = master_df.append(new_df, ignore_index=True, sort=False).copy(deep=True)
+            
             #master_df = new_df.append(master_df, ignore_index=True, sort=False)
-
+            #print(ll_df['Frequency'])
     return master_df
 
 def get_limit_line_slope(signal0, signal1):
+    """
+    Calculates slope of limit line based on 2 coordinates\n
+
+    :param signal0: first signal to use for slope calculation\n
+    :param signal1: second signal to use for slope calculation\n
+
+    :return: slope of limit line
+    """
     signal_list0 = signal0.strip('\n').strip().split('\t')
     signal_list1 = signal1.strip('\n').strip().split('\t')
     
@@ -308,6 +343,12 @@ def get_limit_line_slope(signal0, signal1):
 
 
 def get_coord(signal):
+    """
+    Gets coordinates from limit line file\n
+    :param signal: line from limit line file\n
+
+    :return: tuple containing the x and y coordinates of the line read from limit line file\n
+    """
     signal_list = signal.strip('\n').strip().split('\t')
     signal_list[0] = float(signal_list[0])
     signal_list[1] = float(signal_list[1])
@@ -315,7 +356,14 @@ def get_coord(signal):
 
 
 def calc_limit(slope, frequency, coord0, coord1):
-    
+    """
+    Calculates limit of limit line based on 2 coordinates\n
+
+    :param slope: slope of limit line\n
+    :param frequency: frequency to calculate limit value of\n
+    :param coord0: first coordinate of limit line\n
+    :param coord1: second coordinate of limit line\n
+    """
     if slope == 0:
         return coord0[1]
     elif math.isnan(slope):
@@ -323,6 +371,53 @@ def calc_limit(slope, frequency, coord0, coord1):
     else:
         return slope * math.log10(frequency/coord0[0]) + coord0[1]
 
+
+def create_ll_frequency(LL_FREQUENCY_LIST):
+    """
+    Creates list of individual frequencies for limit line\n
+
+    :param LL_FREQUENCY_LIST: list to add frequencies to\n
+
+    :return: list of frequencies for limit line
+    """
+    frequency = .15
+    while frequency <= 1e3: # Max frequency is 1 GHz
+        while frequency < 10:  # 0.15 - 10 MHz
+            LL_FREQUENCY_LIST.append(frequency)
+            frequency = frequency + 0.25   # Increment in 250 kHz steps
+        while frequency >= 10 and frequency < 100:  # 10 - 100 MHz
+            LL_FREQUENCY_LIST.append(frequency)
+            frequency = frequency + 1   # Increment in 1 MHz steps
+        while frequency >= 100 and frequency < 200: # 100 - 200 MHz
+            LL_FREQUENCY_LIST.append(frequency)
+            frequency = frequency + 2   # Increment in 2 MHz steps
+        while frequency >= 200 and frequency < 400:  # 200 - 400 MHz
+            LL_FREQUENCY_LIST.append(frequency)
+            frequency = frequency + 4   # Increment in 4 MHz steps
+        while frequency >= 400 and frequency <= 1e3: # 400 MHz - 1 GHz
+            LL_FREQUENCY_LIST.append(frequency)
+            frequency = frequency + 10   # Increment in 10 MHz steps
+    return LL_FREQUENCY_LIST
+
+
+def create_ll_df(df, ll_list, path):
+    """
+    Creates limit line data frame with corresponding 'Data Set' value and frequency values\n
+
+    :param df: dataframe to copy for columns\n
+    :param ll_list: list of frequencies for limit line\n
+    :param path: path of limit line file\n
+
+    :return: dataframe for limit line
+    """
+    orig_num_rows = df.shape[0]
+    new_num_rows = len(ll_list)
+    temp_list = []
+    col_names = list(df.columns)
+    ll_df = pd.DataFrame(columns=col_names)
+    ll_df['Frequency'] = ll_list
+    ll_df['Data Set'] = 'LL ' + os.path.splitext(path.split('\\')[-1])[0] # Create name for data set (LL + filename w/o extension)
+    return ll_df
 
 if __name__ == "__main__":
     main()

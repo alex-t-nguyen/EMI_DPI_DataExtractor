@@ -15,7 +15,7 @@ def get_data(filename, info_type):
     data_dict = create_dict(info_type, col_names)
     #with open(filename) as fp:
         # skip_lines(fp, 7)   # skip lines 1-7 in file
-    for line in skip_lines(filename):
+    for line in skip_lines(filename, info_type):
         signal_list = line.strip('\n').strip().split('\t')   # remove \n char at end of line and separate data into list
         #print(signal_list)
 
@@ -42,7 +42,7 @@ def get_data(filename, info_type):
     return data_frame
 
 
-def skip_lines(opened_file):
+def skip_lines(opened_file, info_type):
     """ 
     Skip lines in file up until reading a specific string (constants.DATA_HEADER) (skip first 28 lines)
 
@@ -50,19 +50,20 @@ def skip_lines(opened_file):
     """
     try:
         with codecs.open (opened_file, encoding='utf-16-le') as data_file:
-            """
-            for line in data_file:
-                if constants.DATA_HEADER.encode('utf-16-le') not in line:
-                    data_file.next()
-                    #print("next")
+            
+            for line in data_file:  # Skips lines until reading 'TableValues' line
+                if constants.DATA_HEADER.encode(encoding='utf-16-le') not in line.encode(encoding='utf-16-le'): # Check for 'TableValues' string in line 
+                    continue
                 else:
                     break
-                    print("break")
             """
-            
-            for i in range(28):
-                data_file.readline()
-
+            if info_type.lower() == constants.TYPE_EMISSION:
+                for i in range(29):
+                    data_file.readline()
+            if info_type.lower() == constants.TYPE_DPI:
+                for i in range(28):
+                    data_file.readline()
+            """
             for line in data_file:
                 if not line:
                     continue

@@ -10,15 +10,12 @@ def get_data(filename, info_type):
     :return: pandas data frame containing frequency and data point
     """
 
-    #data_dict = {'Frequency': [], 'Level': []}
     col_names = get_col_names(filename, info_type)
     data_dict = create_dict(info_type, col_names)
-    #with open(filename) as fp:
-        # skip_lines(fp, 7)   # skip lines 1-7 in file
+    
     for line in skip_lines(filename, info_type):
-        signal_list = line.strip('\n').strip().split('\t')   # remove \n char at end of line and separate data into list
-        #print(signal_list)
-
+        signal_list = line.strip('\n').strip().strip('\r').split('\t')   # remove \n char at end of line and separate data into list
+        
         if len(signal_list) <= 1:   # If line is empty -> prevents error when trying to read the empty last line in .Results file
             continue
 
@@ -28,15 +25,6 @@ def get_data(filename, info_type):
 
         append_data(col_names, data_dict, signal_list, info_type)   # Add data from each row into corresponding key/column in data dictionary
 
-        # Assign frequency and level values of signal from signal_list
-        # Not really necessary, but improves readability
-        """
-        frequency = signal_list[0]
-        level = signal_list[1]
-
-        data_dict['Frequency'].append(frequency)    # add frequency component to data_dict
-        data_dict['Level'].append(level)  # add data component to data_dict
-        """
     data_frame = pandas.DataFrame(data_dict)    # turn dictionary into Pandas DataFrame
 
     return data_frame
@@ -56,14 +44,7 @@ def skip_lines(opened_file, info_type):
                     continue
                 else:
                     break
-            """
-            if info_type.lower() == constants.TYPE_EMISSION:
-                for i in range(29):
-                    data_file.readline()
-            if info_type.lower() == constants.TYPE_DPI:
-                for i in range(28):
-                    data_file.readline()
-            """
+            
             for line in data_file:
                 if not line:
                     continue
@@ -85,14 +66,6 @@ def create_dict(info_type, col_names):
         data_dict[name] = []
     # data_dict['Limit Line'] = []    # Add Limit Line column to data dictionary ----- DO this in extract_data.py because we don't want the empty limit line column in individual .csv file --------------------------
     return data_dict
-    """
-    switcher = {
-        constants.TYPE_EMISSION:    
-            {'Frequency': [], 'Level': []},
-        constants.TYPE_DPI: {'Col1': []}#, 'Col2': [], 'Col3': [], 'Col4': []},
-    }
-    return switcher.get(info_type, {})
-    """
 
 
 def append_data(col_names, data_dict, signal_list, info_type):
@@ -113,18 +86,7 @@ def append_data(col_names, data_dict, signal_list, info_type):
 
     for i in range(len(col_names)):
         data_dict[col_names[i]].append(signal_list[index_list[i]])
-    """
-    if info_type == constants.TYPE_EMISSION:
-        data_dict['Frequency'].append(signal_list[0])    # add frequency component to data_dict
-        data_dict['Level'].append(signal_list[1])   # add level component to data_dict
-    elif info_type == constants.TYPE_DPI:
-        data_dict['Col1'].append(signal_list[0])    # add Col1 component to data_dict
-        #data_dict['Col2'].append(signal_list[1])
-        #data_dict['Col3'].append(signal_list[2])
-        #data_dict['Col4'].append(signal_list[3])
-    else:
-        print('Not a valid info_type')
-    """
+    
     return data_dict
 
 
@@ -141,16 +103,25 @@ def get_col_names(filename, info_type):
     with codecs.open (filename, encoding='utf-16-le') as data_file:
         for line in data_file:
             if constants.COLUMN_NAME_HEADER in line:
-                column_names = line.strip('\n').split('\t') # get all column names in file
+                column_names = line.strip('\n').strip('\r').strip().split('\t') # get all column names in file
                 del column_names[0]
                 break
-    for i in range(len(column_names)):
-        if info_type.lower() == constants.TYPE_EMISSION:
-            if i in constants.EMISSION_COL_INDEXES:
-                desired_col_names.append(column_names[i]) # add all desired column names to list
-        if info_type.lower() == constants.TYPE_DPI:
-            if i in constants.DPI_COL_INDEXES:
-                desired_col_names.append(column_names[i])
+    
+    if info_type.lower() == constants.TYPE_EMISSION:
+        desired_col_names.append('Frequency')
+        desired_col_names.append('PK+_CLRWR')
+    if info_type.lower() == constants.TYPE_DPI:
+        desired_col_names.append('Frequency')
+        desired_col_names.append('Imm Level-Pk')
+        if 'MT1' in column_names:
+            desired_col_names.append('MT1')
+            constants.DPI_COL_INDEXES.append(4) # MT1 index
+        if 'MT2' in column_names:
+            desired_col_names.append('MT2')
+            constants.DPI_COL_INDEXES.append(5) # MT2 index
+        if 'MT3' in column_names:
+            desired_col_names.append('MT3')
+            constants.DPI_COL_INDEXES.append(6) # MT3 index
     return desired_col_names
 
 if __name__ == '__main__':

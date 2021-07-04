@@ -118,7 +118,8 @@ def get_dir(root_dir, overwrite=False):
 
             keys_substring = get_key_substring(row['Folders'])
 
-            if all(key in keys_substring for key in selected_dir_list):
+            # Change 'all' to 'any' to check for at least 1 key existing in folder name
+            if all(key in keys_substring for key in selected_dir_list): # If ALL keys entered in custom selection are present in folder name
                 selected_path_list.append(data_frame.iloc[index, 1])
 
     return selected_path_list

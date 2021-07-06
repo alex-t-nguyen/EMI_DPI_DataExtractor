@@ -67,9 +67,11 @@ def main():
                 print("\".csv\" files for all selected \".Result\" files successfullly created.")
             else:    # Mode is general
                 print("\".csv\" files for all \".Result\" files successfullly created.")
+            
         except OSError:
             print("Can't create Pandas dataframe.")
             print("Error: " + sys.exc_info()[0])
+    raw_input("Press any key to exit...")
 
 
 def get_user_input_info():
@@ -421,7 +423,7 @@ def create_mask_df(df):
             try:
                 m1 = float(main_dict['MT1'][i])
                 m2 = float(main_dict['MT2'][i])
-            except ValueError, e:
+            except ValueError as e:
                 print("Mask convert to float error: " + str(e) + "on line " + str(i))
             
             if m1 == 0 and m2 == 0:

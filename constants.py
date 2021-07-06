@@ -24,7 +24,7 @@ KEYS = []
 
 # Identifier columns for info types
 EMISSION_IDENTIFIERS = ['Part ID', 'PG', 'Trim', 'Choke']
-DPI_IDENTIFIERS = ['Part ID', 'PG', 'Package', '-', '-', '-', 'Choke', 'Test1Col', 'Test2Col', 'Test3Col', 'Test4Col', '-', '-', '-', '-', 'Test5Col']
+DPI_IDENTIFIERS = ['Part ID', 'PG', 'Package', '-', '-', '-', 'Choke']
 
 # Limit Line
 LL_FREQUENCY_LIST = []

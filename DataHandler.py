@@ -9,10 +9,12 @@ def get_data(filename, info_type):
     :param filename: name of file to read
     :return: pandas data frame containing frequency and data point
     """
-
     col_names = get_col_names(filename, info_type)
     data_dict = create_dict(info_type, col_names)
     
+    if not check_emi_or_dpi(filename, info_type):
+        return pandas.DataFrame(data_dict)
+
     for line in skip_lines(filename, info_type):
         signal_list = line.strip('\n').strip().strip('\r').split('\t')   # remove \n char at end of line and separate data into list
         
@@ -123,6 +125,31 @@ def get_col_names(filename, info_type):
             desired_col_names.append('MT3')
             constants.DPI_COL_INDEXES.append(6) # MT3 index
     return desired_col_names
+
+
+def check_emi_or_dpi(filename, info_type):
+    """
+    Skips files if data is not matching the info_type
+    i.e. If info_type is DPI -> skip emission files, If info_type is EMI -> skip dpi files
+    :param filename: filename
+    :param info_type: type of data in file to search for
+    :return: boolean
+    """
+    column_names = []
+    with codecs.open (filename, encoding='utf-16-le') as data_file:
+        for line in data_file:
+            if constants.COLUMN_NAME_HEADER in line:
+                column_names = line.strip('\n').strip('\r').strip().split('\t') # get all column names in file
+                del column_names[0]
+                break
+
+    if 'PK+_CLRWR' in column_names and info_type.lower() == 'emission':
+        return True
+    elif 'Imm Level-Pk' in column_names and info_type.lower() == 'dpi':
+        return True
+    else:
+        return False
+
 
 if __name__ == '__main__':
     get_data('Result Table.Result')

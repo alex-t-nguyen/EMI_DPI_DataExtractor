@@ -3,8 +3,9 @@ from extract_data import create_new_filename
 import constants
 import pandas as pd
 import re
+import codecs
 
-def get_file(root_dir, overwrite=False):
+def get_file(root_dir, info_type, overwrite=False):
     """
     Gets all directory paths in root folder for all .Result files that don't have a corresponding .csv file.\n
 
@@ -18,11 +19,12 @@ def get_file(root_dir, overwrite=False):
         if constants.DATA_FILE_NAME in files: # if .Result file is in folder
             result_file_flag = True
             csv_file_name = create_new_filename(root, constants.CSV_FILE_NAME)   # new .csv file name
-            if overwrite:   # if overwriting current .csv files
-                file_path_list.append(root)
+            if overwrite:   # if overwriting current .csv files               
+                file_path_list.append(root) # Add folder path to list to create .csv later on    
             else:   # if ignoring current .csv files
-                if csv_file_name not in files:  # if .csv file for corresponding .Result file is not in folder
-                    file_path_list.append(root) # Add folder path to list to create .csv later on
+                if csv_file_name not in files:  # if .csv file for corresponding .Result file is not in folder            
+                    file_path_list.append(root) # Add folder path to list to create .csv later on 
+
     if not result_file_flag:
         print("No \"Result Table.Result\" files found in specified path ({}).".format(root_dir))          
     elif not file_path_list:
@@ -56,8 +58,6 @@ def get_dir(root_dir, overwrite=False):
                     folder_properties.append(root.split('\\')[-1]) # Add folder name to list
                     folder_properties.append(root) # Add folder path to list to navigate with later on
                     folder_list.append(folder_properties[:]) # Add list of folder properties (name and path) to folder list
-            #print(folder_properties)
-            #print(folder_list)
 
     if not result_file_flag:
         print("No \"Result Table.Result\" files found in specified path ({}).".format(root_dir)) 

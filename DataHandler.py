@@ -9,11 +9,13 @@ def get_data(filename, info_type):
     :param filename: name of file to read
     :return: pandas data frame containing frequency and data point
     """
-
     col_names = get_col_names(filename, info_type)
-    data_dict = create_dict(info_type, col_names)
+    data_dict = create_dict(col_names)
     
-    for line in skip_lines(filename, info_type):
+    if not check_emi_or_dpi(filename, info_type):   # If info type does not match file read
+        return pandas.DataFrame(data_dict)  # Return empty dataframe with only column values 
+
+    for line in skip_lines(filename):
         signal_list = line.strip('\n').strip().strip('\r').split('\t')   # remove \n char at end of line and separate data into list
         
         if len(signal_list) <= 1:   # If line is empty -> prevents error when trying to read the empty last line in .Results file
@@ -30,7 +32,7 @@ def get_data(filename, info_type):
     return data_frame
 
 
-def skip_lines(opened_file, info_type):
+def skip_lines(opened_file):
     """ 
     Skip lines in file up until reading a specific string (constants.DATA_HEADER) (skip first 28 lines)
 
@@ -54,11 +56,10 @@ def skip_lines(opened_file, info_type):
         print("Can't open file")
 
 
-def create_dict(info_type, col_names):
+def create_dict(col_names):
     """ 
     Creates a dictionary with all of the column names as keys and empty lists as values for each key
 
-    :param info_type: type of data in file (i.e. emission, DPI, etc.)
     :col_names: names of columns to be used as keys in dictionary
     """
     data_dict = {}
@@ -83,6 +84,8 @@ def append_data(col_names, data_dict, signal_list, info_type):
         index_list = constants.EMISSION_COL_INDEXES[:]
     elif info_type.lower() == constants.TYPE_DPI:
         index_list = constants.DPI_COL_INDEXES[:]
+    elif info_type.lower() == constants.TYPE_EUT_FILE:
+        index_list = constants.EUT_FILE_COL_INDEXES[:]
 
     for i in range(len(col_names)):
         data_dict[col_names[i]].append(signal_list[index_list[i]])
@@ -123,6 +126,66 @@ def get_col_names(filename, info_type):
             desired_col_names.append('MT3')
             constants.DPI_COL_INDEXES.append(6) # MT3 index
     return desired_col_names
+
+
+def check_emi_or_dpi(filename, info_type):
+    """
+    Skips files if data is not matching the info_type
+    i.e. If info_type is DPI -> skip emission files, If info_type is EMI -> skip dpi files
+    :param filename: filename
+    :param info_type: type of data in file to search for
+    :return: boolean
+    """
+    column_names = []
+    with codecs.open (filename, encoding='utf-16-le') as data_file:
+        for line in data_file:
+            if constants.COLUMN_NAME_HEADER in line:
+                column_names = line.strip('\n').strip('\r').strip().split('\t') # get all column names in file
+                del column_names[0]
+                break
+
+    if 'PK+_CLRWR' in column_names and info_type.lower() == 'emission':
+        return True
+    elif 'Imm Level-Pk' in column_names and info_type.lower() == 'dpi':
+        return True
+    else:
+        return False
+
+
+def get_EUT_data(filename):
+    column_names = constants.EUT_COL_NAMES[:]
+    EUT_data_dict = {}#create_dict(column_names)
+
+    for line in skip_lines(filename):   # Returns empty data frame if no data lines to read
+        signal_list = line.strip('\n').strip().strip('\r').split('\t')   # remove \n char at end of line and separate data into list
+        
+        if len(signal_list) <= 1:   # If line is empty -> prevents error when trying to read the empty last line in .Results file
+            continue
+
+        for i in range(len(signal_list)):
+            if signal_list[i] == '---':
+                signal_list[i] = '' # make dashes equal to blank instead of NaN since spotfire does it anyway
+
+        #append_data(column_names, EUT_data_dict, signal_list, constants.TYPE_EUT_FILE)   # Add data from each row into corresponding key/column in data dictionary
+        EUT_data_dict = append_EUT_dict(EUT_data_dict, signal_list)
+    #data_frame = pandas.DataFrame(EUT_data_dict)    # turn dictionary into Pandas DataFrame
+    #print(EUT_data_dict)
+    return EUT_data_dict
+
+
+def append_EUT_dict(data_dict, signal):
+    frequency_key = constants.EUT_FILE_COL_INDEXES[0]
+    mask_key = constants.EUT_FILE_COL_INDEXES[1]
+    data_key = constants.EUT_FILE_COL_INDEXES[2]
+
+    if float(signal[frequency_key]) in data_dict.keys():    # If frequency is already a key in dict
+        data_dict[float(signal[frequency_key])].update({signal[mask_key]: float(signal[data_key])}) # add second data to dict
+    else:   # If frequency is not already a key in dict
+        data_dict.update({float(signal[frequency_key]): {}})    # Add to dict{frequency: {}}
+        data_dict[float(signal[frequency_key])].update({signal[mask_key]: float(signal[data_key])}) # Add data dict{frequency: {mask: value}}
+
+    return data_dict
+
 
 if __name__ == '__main__':
     get_data('Result Table.Result')

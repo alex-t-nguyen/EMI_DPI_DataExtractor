@@ -1,4 +1,4 @@
-from DataHandler import get_data
+from DataHandler import get_data, get_EUT_data
 import FileHandler as fh
 import pandas as pd
 import os
@@ -8,6 +8,7 @@ import constants
 from itertools import izip
 import codecs
 import math
+import datetime
 
 def main():
     info_type = get_user_input_info()   # User input info type
@@ -25,7 +26,7 @@ def main():
             file_path_list = fh.get_dir(dir_path, overwrite)
             correct_mode = True
         elif mode.lower() == constants.MODE_GENERAL or mode.lower() == 'g':    # Mode is general
-            file_path_list = fh.get_file(dir_path, overwrite)
+            file_path_list = fh.get_file(dir_path, info_type, overwrite)
             correct_mode = True
         else:
             print("Invalid mode type.")
@@ -35,33 +36,52 @@ def main():
             for path in file_path_list:
                 os.chdir(path)
                 df = get_data(constants.FILE_NAME, info_type)
-                mask_df_list = create_mask_df(df)   # Create list of mask dataframes
+                EUT_dict = {}
+                if info_type.lower() == constants.TYPE_DPI:
+                    EUT_dict = get_EUT_data(constants.EUT_FILE_NAME)
+                if df.empty:
+                    continue
+                mask_df_list = create_mask_df(df, EUT_dict)   # Create list of mask dataframes
                 
-                num_masks = len(mask_df_list)
+                num_masks = len(mask_df_list)   # Subtract 1 because list contains all masks + the original data (i.e. 2 masks in file = 2 masks + 1 = 3 data frames total)
+                
                 for i in range(num_masks):
 
-                    mask_df_list[i] = add_identifier_columns(mask_df_list[i], info_type, path.split('\\')[-1], num_masks, i).copy(deep=True)
+                    mask_df_list[i] = add_identifier_columns(mask_df_list[i], info_type, path.split('\\')[-1], num_masks, i).copy(deep=True)    # Add additional columns (including MT columns)
         
-                    new_filename = create_new_filename(path, constants.CSV_FILE_NAME, None, num_masks, i)
-                    
-                    mask_df_list[i].to_csv(new_filename, sep = ',', index = False)
+                    new_filename = create_new_filename(path, constants.CSV_FILE_NAME, '', None, num_masks, i)    # Create .csv filename for individual .Result files
+                    try:
+                        mask_df_list[i].to_csv(new_filename, sep = ',', index = False)
+                    except IOError as e:
+                        print(e)
+                        print("Filename too long. Creating generic filename instead.\n")
+                        generic_new_filename = create_generic_filename(constants.CSV_FILE_NAME, '', None, num_masks, i)
+                        mask_df_list[i].to_csv(generic_new_filename, sep = ',', index = False)
 
                     if 'MT1' in mask_df_list[i].columns:    # If dataframe has MT column -> drop them
-                        for j in range(num_masks):                     
+                        for j in range(num_masks - 1):                     
                             mask_df_list[i].drop('MT{}'.format(j + 1), axis=1, inplace=True)
                    
                     mask_df_list[i]['Limit Line'] = ''  # Add limit line column and set values to empty
                     
                     df_list.append((mask_df_list[i], path.split('\\')[-1])) # Append individual dataframes to list
                     
-            
+            if not df_list: # If list of dataframes is empty
+                print("\nNo \".Result\" files found for data of type [{}].".format(info_type.upper()))
+                return None
             master_df = create_master_df(df_list)   # Combine all dataframes into a master dataframe
 
             master_df = add_limit_line(master_df, df_list, dir_path, info_type).copy(deep=True) # Add limit line values to limit line dataframe in master dataframe
 
             os.chdir(dir_path)
-            aggregated_csv_filename = create_new_filename(dir_path, constants.AGGREGATED_CSV_FILE_NAME, constants.KEYS) 
-            master_df.to_csv(aggregated_csv_filename, sep= ',', index = False)  # Create .csv file from master dataframe
+            try:
+                aggregated_csv_filename = create_new_filename(dir_path, constants.AGGREGATED_CSV_FILE_NAME, info_type, constants.KEYS) 
+                master_df.to_csv(aggregated_csv_filename, sep= ',', index = False)  # Create .csv file from master dataframe
+            except IOError as e:
+                print(e)
+                print("Filename for aggregated file too long. Creating generic filename instead.\n")
+                aggregated_generic_new_filename = create_generic_filename(constants.AGGREGATED_CSV_FILE_NAME, info_type, constants.KEYS)
+                master_df.to_csv(aggregated_generic_new_filename, sep = ',', index=False)
             
             if mode.lower() == constants.MODE_SELECTIVE:    # Mode is selective
                 print("\".csv\" files for all selected \".Result\" files successfullly created.")
@@ -105,10 +125,9 @@ def get_user_input_mode():
     :return: mode type
     """
     mode = raw_input("Select data extraction mode ({}) (G/S): ".format(', '.join(constants.MODE_TYPES_LIST)))
-    if mode != 'g' and mode != 's':
-        while mode not in constants.MODE_TYPES_LIST:
-            print("The selected mode type is not an available option.")
-            mode  = raw_input("Select data extraction mode ({}): ".format(', '.join(constants.MODE_TYPES_LIST)))
+    while mode not in constants.MODE_TYPES_LIST and mode.lower() != 'g' and mode.lower() != 's':
+        print("The selected mode type is not an available option.")
+        mode  = raw_input("Select data extraction mode ({}) (G/S): ".format(', '.join(constants.MODE_TYPES_LIST)))
     return mode
 
 
@@ -132,7 +151,7 @@ def get_user_input_overwrite():
     return overwrite
 
 
-def create_new_filename(path, appended_filename, keys=None, num_masks=1, mask_index=0):
+def create_new_filename(path, appended_filename, info_type='', keys=None, num_masks=1, mask_index=0):
     """
     Creates new file name for generated .csv file.\n
 
@@ -143,14 +162,20 @@ def create_new_filename(path, appended_filename, keys=None, num_masks=1, mask_in
     """
     file_base_name = path.split('\\')[-1]
     mask_name = ''
-    if num_masks > 1:
-        mask_name = '_M{}_'.format(mask_index + 1)
+    if num_masks > 1 and mask_index != num_masks - 1:
+        mask_name = '_M{}'.format(mask_index + 1)
     if keys:
         keys_as_string = ' '.join(map(str, keys))
         string_keys = "_keys=[{}]".format(keys_as_string if keys else "")
-        return file_base_name + string_keys + mask_name + appended_filename
+        if not info_type:
+            return file_base_name + string_keys + mask_name + appended_filename # Name for individual .csv files
+        else:
+            return file_base_name + string_keys + mask_name + '_{}'.format(info_type).upper() + appended_filename   # Name for aggregated .csv files
     else:
-        return file_base_name + mask_name + appended_filename
+        if not info_type:
+            return file_base_name + mask_name + appended_filename   # Name for individual .csv files
+        else:
+            return file_base_name + mask_name + '_{}'.format(info_type).upper() + appended_filename # Name for aggregates .csv files
 
 
 def create_master_df(df_list):
@@ -180,7 +205,7 @@ def create_master_df(df_list):
 
 def add_identifier_columns(data_frame, info_type, folder_name, num_masks, mask_index = 0):
     keys = folder_name.split(' ')
-    if num_masks > 1:
+    if num_masks > 1 and mask_index != num_masks - 1:   # Skip original dataframe (last index in list) if there are masks
         data_frame['Data Set'] = folder_name + "_M{}".format(mask_index + 1)
     else:
         data_frame['Data Set'] = folder_name
@@ -211,7 +236,7 @@ def add_limit_line(master_df, df_list, path, info_type):
                 if filename not in temp_ll_file_list:
                     limit_line_file_list.append(os.path.join(root, filename))
                     temp_ll_file_list.append(filename)
-    if not limit_line_file_flag:
+    if not limit_line_file_flag:    # If no limit line files found
         print("No \".LimitLine\" files found in specified path ({}).".format(path))
 
     df_only_list = []
@@ -248,7 +273,6 @@ def add_limit_line(master_df, df_list, path, info_type):
 
                 if math.isnan(slope):
                     continue
-                
                 
                 
                 ll_df = create_ll_df(df, constants.LL_FREQUENCY_LIST, limit_line_path)
@@ -369,19 +393,20 @@ def create_ll_df(df, ll_list, path):
     return ll_df
 
 
-def create_mask_df(df):
+def create_mask_df(df, EUT_dict):
     # 1) Turn DataFrame into dictionary
     # 2) Read Frequency, Power, and MT columns
     # 3) Create n dictionaries based on how many MT columns there are
     # 4) If all MT are 0 -> follow power levels
-            # If MT1 = 1 and MT2 = 0 -> MT1 follows power level, MT2 stays at the previous value before changing
-            # If MT1 = 0 and MT2 = 1
+            # If both pass -> follow table
+            # If 1 fails & 1 pass -> FAIL: assign value for it from EUT file / PASS: assign value for it from common_level (both pass)
+            # If both fail -> assign both corresponding values from EUT file
     # 5) Turn all dictionaries into DataFrames
     # 6) Return list of DataFrames
     main_dict = df.to_dict()
 
-    level_key = list(df.columns)[1]
-    level_list = main_dict[level_key]
+    level_key = list(df.columns)[1] # Magnitude column header
+    level_list = main_dict[level_key]   # Values in magnitude column
     df_list = []
     if 'MT3' in main_dict.keys():   # If file has 3 masks
         common_level = level_list[0]
@@ -394,18 +419,40 @@ def create_mask_df(df):
             m1 = float(main_dict['MT1'][i])
             m2 = float(main_dict['MT2'][i])
             m3 = float(main_dict['MT3'][i])
-            if m1 == 0 and m2 == 0:
-                common_level = level_list[i]
-            elif m1 == 1 and m2 == 0 and m3 == 0:
-                m2_dict[level_key][i] = common_level
-                m3_dict[level_key][i] = common_level
-            elif m2 == 1 and m1 == 0 and m3 == 0:
-                m1_dict[level_key][i] = common_level
-                m3_dict[level_key][i] = common_level
-            elif m3 == 1 and m1 == 0 and m2 == 0:
-                m2_dict[level_key][i] = common_level
-                m1_dict[level_key][i] = common_level
-        
+            try:
+                if m1 == 0 and m2 == 0 and m3 == 0:
+                    common_level = level_list[i]
+                elif m1 == 1 and m2 == 0 and m3 == 0:
+                    m2_dict[level_key][i] = common_level
+                    m3_dict[level_key][i] = common_level
+                    m1_dict[level_key][i] = EUT_dict[float(m1_dict['Frequency'][i])]['MT1']
+                elif m2 == 1 and m1 == 0 and m3 == 0:
+                    m1_dict[level_key][i] = common_level
+                    m3_dict[level_key][i] = common_level
+                    m2_dict[level_key][i] = EUT_dict[float(m2_dict['Frequency'][i])]['MT2']
+                elif m3 == 1 and m1 == 0 and m2 == 0:
+                    m2_dict[level_key][i] = common_level
+                    m1_dict[level_key][i] = common_level
+                    m3_dict[level_key][i] = EUT_dict[float(m3_dict['Frequency'][i])]['MT3']
+                elif m1 == 1 and m2 == 1 and m3 == 0:
+                    m1_dict[level_key][i] = EUT_dict[float(m1_dict['Frequency'][i])]['MT1']
+                    m2_dict[level_key][i] = EUT_dict[float(m2_dict['Frequency'][i])]['MT2']
+                    m3_dict[level_key][i] = common_level
+                elif m1 == 1 and m3 == 1 and m2 == 0:
+                    m1_dict[level_key][i] = EUT_dict[float(m1_dict['Frequency'][i])]['MT1']
+                    m3_dict[level_key][i] = EUT_dict[float(m3_dict['Frequency'][i])]['MT3']
+                    m2_dict[level_key][i] = common_level
+                elif m2 == 1 and m3 == 1 and m1 == 0:
+                    m2_dict[level_key][i] = EUT_dict[float(m2_dict['Frequency'][i])]['MT2']
+                    m3_dict[level_key][i] = EUT_dict[float(m3_dict['Frequency'][i])]['MT3']
+                    m1_dict[level_key][i] = common_level
+                elif m1 == 1 and m2 == 1 and m3 == 1:
+                    m1_dict[level_key][i] = EUT_dict[float(m1_dict['Frequency'][i])]['MT1']
+                    m2_dict[level_key][i] = EUT_dict[float(m2_dict['Frequency'][i])]['MT2']
+                    m3_dict[level_key][i] = EUT_dict[float(m3_dict['Frequency'][i])]['MT3']
+            except KeyError as e:
+                print("Could not find frequency [{}] from \".Result file\" in EUT file.".format(e))
+                print("Using data from \".Result\" file instead.\n")
         m1_df = pd.DataFrame(m1_dict)
         m2_df = pd.DataFrame(m2_dict)
         m3_df = pd.DataFrame(m3_dict)
@@ -426,20 +473,50 @@ def create_mask_df(df):
             except ValueError as e:
                 print("Mask convert to float error: " + str(e) + "on line " + str(i))
             
-            if m1 == 0 and m2 == 0:
-                common_level = level_list[i]
-            elif m1 == 1 and m2 == 0:
-                m2_dict[level_key][i] = common_level
-            elif m2 == 1 and m1 == 0:
-                m1_dict[level_key][i] = common_level
+            try:
+                if m1 == 0 and m2 == 0: # Change common level value & Make no change to data b/c both pass
+                    common_level = level_list[i]
+                elif m1 == 1 and m2 == 0:   # M1 fails -> Read EUT data / M2 pass -> Assign common level value
+                    m2_dict[level_key][i] = common_level
+                    m1_dict[level_key][i] = EUT_dict[float(m1_dict['Frequency'][i])]['MT1']  # Value of corresponding frequency in EUT_dict for MT1
+                elif m2 == 1 and m1 == 0:   # M2 fails -> Read EUT data / M1 pass -> Assign common level value
+                    m1_dict[level_key][i] = common_level
+                    m2_dict[level_key][i] = EUT_dict[float(m2_dict['Frequency'][i])]['MT2']  # Value of corresponding frequency in EUT_dict for MT2
+                elif m1 == 1 and m2 == 1:   # M1 & M2 fails -> Read EUT data
+                    m1_dict[level_key][i] = EUT_dict[float(m1_dict['Frequency'][i])]['MT1']  # Value of corresponding frequency in EUT_dict for MT1
+                    m2_dict[level_key][i] = EUT_dict[float(m2_dict['Frequency'][i])]['MT2']  # Value of corresponding frequency in EUT_dict for MT2
+            except KeyError as e:
+                print("Could not find frequency [{}] from \".Result file\" in EUT file.".format(e))
+                print("Using data from \".Result\" file instead.\n")
         m1_df = pd.DataFrame(m1_dict)
         m2_df = pd.DataFrame(m2_dict)
         df_list.append(m1_df)
         df_list.append(m2_df)
-    else:   # If file has no masks -> return the original dataframe
-        df_list.append(df)
+    # Commented b/c always returning original dataframe
+    #else:   # If file has no masks -> return the original dataframe
+    df_list.append(df)  
     return df_list
     
+
+def read_EUT_file():
+    """
+    Read EUTF file and turn data into dictionary
+    """
+
+def create_generic_filename(appended_filename, info_type='', keys=None, num_masks=1, mask_index=0):
+    mask_name = ''
+    string_keys = ''
+    date = datetime.datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
+    if num_masks > 1 and mask_index != num_masks - 1:
+        mask_name = '_M{}'.format(mask_index + 1)
+    if keys:
+        keys_as_string = ' '.join(map(str, keys))
+        string_keys = "_keys=[{}]".format(keys_as_string if keys else "")
+    if not info_type:
+        return 'Generic_Filename' + string_keys + mask_name + '_' + str(date) +  appended_filename
+    else:
+        return 'Generic_Filename' + mask_name + '_{}'.format(info_type).upper() + str(date) + appended_filename # Name for aggregates .csv files
+
 
 if __name__ == "__main__":
     main()
